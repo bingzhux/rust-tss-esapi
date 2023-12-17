@@ -6,7 +6,7 @@ use crate::{
     interface_types::resource_handles::{NvAuth, Provision},
     structures::{Auth, MaxNvBuffer, Name, NvPublic},
     tss2_esys::{
-        Esys_NV_DefineSpace, Esys_NV_Increment, Esys_NV_Read, Esys_NV_ReadPublic,
+        Esys_NV_DefineSpace, Esys_NV_Increment, Esys_NV_Read, Esys_NV_ReadLock, Esys_NV_ReadPublic,
         Esys_NV_UndefineSpace, Esys_NV_UndefineSpaceSpecial, Esys_NV_Write,
     },
     Context, Result, ReturnCode,
@@ -828,7 +828,62 @@ impl Context {
         MaxNvBuffer::try_from(Context::ffi_data_to_owned(data_ptr))
     }
 
-    // Missing function: NV_ReadLock
+    ///
+    /// Lock an nv index from further reading
+    /// 
+    /// # Details
+    /// If TPMA_NV_READ_STCLEAR is SET in an Index, then this command may be used to 
+    /// prevent further reads of the NV Index until the next TPM2_Startup (TPM_SU_CLEAR).
+    /// 
+    /// Proper authorizations are required for this command as determined by TPMA_NV_PPREAD,
+    /// TPMA_NV_OWNERREAD, TPMA_NV_AUTHREAD, and the authPolicy of the NV Index.
+    /// 
+    /// `NOTE` Only an entity that may read an Index is allowed to lock the NV Index for read.
+    /// 
+    /// If the command is properly authorized and TPMA_NV_READ_STCLEAR of the NV Index is SET, 
+    /// then the TPM shall SET TPMA_NV_READLOCKED for the NV Index. 
+    /// 
+    /// If TPMA_NV_READ_STCLEAR of the NV Index is CLEAR, then the TPM shall return 
+    /// TPM_RC_ATTRIBUTES. TPMA_NV_READLOCKED will be CLEAR by the next TPM2_Startup(TPM_SU_CLEAR).
+    /// 
+    /// It is not an error to use this command for an Index that is already locked for reading.
+    /// 
+    /// An Index that had not been written may be locked for reading
+    /// 
+    /// Please beware that this method requires an authorization session handle to be present.
+    ///
+    /// # Arguments
+    /// * `auth_handle` - Handle indicating the source of authorization value.
+    /// * `nv_index_handle` - The [NvIndexHandle] associated with NV memory
+    ///                       where data is to be written.    
+    /// 
+    /// # Example    
+    /// TODO
+    /// 
+    pub fn nv_readlock(
+        &mut self,
+        auth_handle: NvAuth,
+        nv_index_handle: NvIndexHandle
+    ) -> Result<()> {
+        ReturnCode::ensure_success(
+            unsafe {
+                Esys_NV_ReadLock(
+                    self.mut_context(),
+                    AuthHandle::from(auth_handle).into(),
+                    nv_index_handle.into(),
+                    self.required_session_1()?,
+                    self.optional_session_2(),
+                    self.optional_session_3(),
+                )
+            },
+            |ret| {
+                error!("Error when locking NV: {:#010X}", ret);
+            },
+        )
+    }
+
+
+
     // Missing function: NV_ChangeAuth
     // Missing function: NV_Certify
 }
