@@ -7,7 +7,7 @@ use crate::{
     structures::{Auth, MaxNvBuffer, Name, NvPublic},
     tss2_esys::{
         Esys_NV_DefineSpace, Esys_NV_Increment, Esys_NV_Read, Esys_NV_ReadLock, Esys_NV_ReadPublic,
-        Esys_NV_UndefineSpace, Esys_NV_UndefineSpaceSpecial, Esys_NV_Write,
+        Esys_NV_UndefineSpace, Esys_NV_UndefineSpaceSpecial, Esys_NV_Write,Esys_NV_WriteLock
     },
     Context, Result, ReturnCode,
 };
@@ -700,7 +700,6 @@ impl Context {
 
     // Missing function: NV_Extend
     // Missing function: NV_SetBits
-    // Missing function: NV_WriteLock
     // Missing function: NV_GlobalWriteLock
 
     /// Reads data from the nv index.
@@ -855,7 +854,7 @@ impl Context {
     /// # Arguments
     /// * `auth_handle` - Handle indicating the source of authorization value.
     /// * `nv_index_handle` - The [NvIndexHandle] associated with NV memory
-    ///                       where data is to be written.    
+    ///                       where data is to be locked.    
     /// 
     /// # Example    
     /// TODO
@@ -882,7 +881,59 @@ impl Context {
         )
     }
 
-
+    ///
+    /// Lock an nv index from further writing
+    /// 
+    /// # Details
+    /// 
+    /// If the TPMA_NV_WRITEDEFINE or TPMA_NV_WRITE_STCLEAR attributes of an NV location are SET,
+    /// then this command may be used to inhibit further writes of the NV Index.
+    /// 
+    /// Proper write authorization is required for this command as determined by TPMA_NV_PPWRITE,
+    /// TPMA_NV_OWNERWRITE, TPMA_NV_AUTHWRITE, and the authPolicy of the NV Index.
+    /// 
+    /// It is not an error if TPMA_NV_WRITELOCKED for the NV Index is already SET.
+    /// 
+    /// If neither TPMA_NV_WRITEDEFINE nor TPMA_NV_WRITE_STCLEAR of the NV Index is SET, then the
+    /// TPM shall return TPM_RC_ATTRIBUTES.
+    /// 
+    /// If the command is properly authorized and TPMA_NV_WRITE_STCLEAR or TPMA_NV_WRITEDEFINE
+    /// is SET, then the TPM shall SET TPMA_NV_WRITELOCKED for the NV Index.
+    /// 
+    /// TPMA_NV_WRITELOCKED will be clear on the next TPM2_Startup(TPM_SU_CLEAR) unless
+    /// TPMA_NV_WRITEDEFINE is SET or if TPMA_NV_WRITTEN is CLEAR.
+    /// 
+    /// Please beware that this method requires an authorization session handle to be present.
+    ///
+    /// # Arguments
+    /// * `auth_handle` - Handle indicating the source of authorization value.
+    /// * `nv_index_handle` - The [NvIndexHandle] associated with NV memory
+    ///                       where data is to be locked.    
+    /// 
+    /// # Example    
+    /// TODO
+    /// 
+    pub fn nv_writelock(
+        &mut self,
+        auth_handle: NvAuth,
+        nv_index_handle: NvIndexHandle
+    ) -> Result<()> {
+        ReturnCode::ensure_success(
+            unsafe {
+                Esys_NV_WriteLock(
+                    self.mut_context(),
+                    AuthHandle::from(auth_handle).into(),
+                    nv_index_handle.into(),
+                    self.required_session_1()?,
+                    self.optional_session_2(),
+                    self.optional_session_3(),
+                )
+            },
+            |ret| {
+                error!("Error when locking NV: {:#010X}", ret);
+            },
+        )
+    }
 
     // Missing function: NV_ChangeAuth
     // Missing function: NV_Certify
